@@ -22,6 +22,7 @@ class TechniciansProvider extends ChangeNotifier {
       } else {
         _technicians = snapshot.docs.map((doc) {
           final data = Map<String, dynamic>.from(doc.data());
+          // Ensure the document ID is always set in the model
           if (data['id'] == null || data['id'].toString().isEmpty) {
             data['id'] = doc.id;
           }
