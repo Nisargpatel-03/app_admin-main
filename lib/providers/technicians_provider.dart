@@ -20,7 +20,13 @@ class TechniciansProvider extends ChangeNotifier {
       if (snapshot.docs.isEmpty) {
         await _seedMockData();
       } else {
-        _technicians = snapshot.docs.map((doc) => Technician.fromMap(doc.data())).toList();
+        _technicians = snapshot.docs.map((doc) {
+          final data = Map<String, dynamic>.from(doc.data());
+          if (data['id'] == null || data['id'].toString().isEmpty) {
+            data['id'] = doc.id;
+          }
+          return Technician.fromMap(data);
+        }).toList();
         _isLoading = false;
         notifyListeners();
       }

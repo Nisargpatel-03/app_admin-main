@@ -21,7 +21,14 @@ class ComplaintsProvider extends ChangeNotifier {
         // Optional: Seed mock data if collection is empty
         await _seedMockData();
       } else {
-        _complaints = snapshot.docs.map((doc) => Complaint.fromMap(doc.data())).toList();
+        _complaints = snapshot.docs.map((doc) {
+          final data = Map<String, dynamic>.from(doc.data());
+          // Ensure the document ID is always set in the model
+          if (data['id'] == null || data['id'].toString().isEmpty) {
+            data['id'] = doc.id;
+          }
+          return Complaint.fromMap(data);
+        }).toList();
         _isLoading = false;
         notifyListeners();
       }
@@ -54,7 +61,7 @@ class ComplaintsProvider extends ChangeNotifier {
     final c = getById(id);
     if (c != null) {
       final updatedLogs = List<LogEntry>.from(c.logs)
-        ..add(LogEntry(time: DateTime.now(), action: 'Complaint accepted and set to active', by: 'Admin'));
+        ..add(LogEntry(time: DateTime.now(), action: 'Complaint accepted', by: 'Admin'));
       
       await _db.collection('complaints').doc(id).update({
         'status': ComplaintStatus.active.name,
@@ -84,13 +91,20 @@ class ComplaintsProvider extends ChangeNotifier {
     final c = getById(id);
     if (c != null) {
       final updatedLogs = List<LogEntry>.from(c.logs)
-        ..add(LogEntry(time: DateTime.now(), action: 'Assigned technician $techId', by: 'Admin'));
+        ..add(LogEntry(time: DateTime.now(), action: 'Assigned to technician: $techId', by: 'Admin'));
 
-      await _db.collection('complaints').doc(id).update({
+      final updates = {
         'assignedTechnicianId': techId,
         'updatedAt': Timestamp.now(),
         'logs': updatedLogs.map((l) => l.toMap()).toList(),
-      });
+      };
+
+      // If assigning, also set to active if it was pending
+      if (c.status == ComplaintStatus.pending) {
+        updates['status'] = ComplaintStatus.active.name;
+      }
+
+      await _db.collection('complaints').doc(id).update(updates);
     }
   }
 

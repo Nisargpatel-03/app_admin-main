@@ -14,9 +14,9 @@ class Customer {
   };
 
   factory Customer.fromMap(Map<String, dynamic> map) => Customer(
-    name: map['name'] ?? '',
-    phone: map['phone'] ?? '',
-    email: map['email'] ?? '',
+    name: map['name'] ?? map['customer_name'] ?? map['userName'] ?? '',
+    phone: map['phone'] ?? map['customer_phone'] ?? map['userPhone'] ?? map['contact'] ?? '',
+    email: map['email'] ?? map['customer_email'] ?? '',
   );
 }
 
@@ -37,12 +37,12 @@ class Device {
   };
 
   factory Device.fromMap(Map<String, dynamic> map) => Device(
-    type: map['type'] ?? '',
+    type: map['type'] ?? map['device_type'] ?? map['device'] ?? '',
     brand: map['brand'] ?? '',
     model: map['model'] ?? '',
     serial: map['serial'] ?? '',
-    purchaseDate: map['purchaseDate'] ?? '',
-    warrantyExpiry: map['warrantyExpiry'] ?? '',
+    purchaseDate: map['purchaseDate'] ?? map['purchase_date'] ?? '',
+    warrantyExpiry: map['warrantyExpiry'] ?? map['warranty_expiry'] ?? '',
   );
 }
 
@@ -113,18 +113,28 @@ class Complaint {
 
   factory Complaint.fromMap(Map<String, dynamic> map) => Complaint(
     id: map['id'] ?? '',
-    ticketNo: map['ticketNo'] ?? map['ticket_no'] ?? '',
-    customer: Customer.fromMap(map['customer'] is Map ? Map<String, dynamic>.from(map['customer']) : {}),
-    device: Device.fromMap(map['device'] is Map ? Map<String, dynamic>.from(map['device']) : {}),
-    issue: map['issue'] ?? '',
-    description: map['description'] ?? '',
+    ticketNo: map['ticketNo'] ?? map['ticket_no'] ?? map['ticket_id'] ?? '',
+    customer: map['customer'] is Map 
+        ? Customer.fromMap(Map<String, dynamic>.from(map['customer']))
+        : Customer.fromMap(map), // Try reading from top level if not nested
+    device: map['device'] is Map 
+        ? Device.fromMap(Map<String, dynamic>.from(map['device']))
+        : Device.fromMap(map), // Try reading from top level if not nested
+    issue: map['issue'] ?? map['details'] ?? map['problem'] ?? '',
+    description: map['description'] ?? map['detailed_description'] ?? '',
     status: ComplaintStatus.values.firstWhere((e) => e.name == map['status'], orElse: () => ComplaintStatus.pending),
     priority: Priority.values.firstWhere((e) => e.name == map['priority'], orElse: () => Priority.medium),
     district: map['district'] ?? '',
     address: map['address'] ?? '',
-    createdAt: (map['createdAt'] is Timestamp) ? (map['createdAt'] as Timestamp).toDate() : DateTime.now(),
-    updatedAt: (map['updatedAt'] is Timestamp) ? (map['updatedAt'] as Timestamp).toDate() : DateTime.now(),
-    assignedTechnicianId: map['assignedTechnicianId'],
+    createdAt: (map['createdAt'] is Timestamp) 
+        ? (map['createdAt'] as Timestamp).toDate() 
+        : (map['createdAt'] is String) 
+            ? (DateTime.tryParse(map['createdAt']) ?? DateTime.now())
+            : DateTime.now(),
+    updatedAt: (map['updatedAt'] is Timestamp) 
+        ? (map['updatedAt'] as Timestamp).toDate() 
+        : DateTime.now(),
+    assignedTechnicianId: map['assignedTechnicianId'] ?? map['assigned_technician_id'],
     attachments: List<String>.from(map['attachments'] ?? []),
     notes: List<String>.from(map['notes'] ?? []),
     parts: List<String>.from(map['parts'] ?? []),

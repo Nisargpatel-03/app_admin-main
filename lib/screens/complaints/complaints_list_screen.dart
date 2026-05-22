@@ -103,18 +103,28 @@ class _NewComplaintDialogState extends State<_NewComplaintDialog> {
   final _formKey = GlobalKey<FormState>();
   final _customerCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _deviceCtrl = TextEditingController();
+  final _brandCtrl = TextEditingController();
+  final _modelCtrl = TextEditingController();
   final _issueCtrl = TextEditingController();
   final _districtCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
   Priority _priority = Priority.medium;
 
   @override
   void dispose() {
     _customerCtrl.dispose();
     _phoneCtrl.dispose();
+    _emailCtrl.dispose();
     _deviceCtrl.dispose();
+    _brandCtrl.dispose();
+    _modelCtrl.dispose();
     _issueCtrl.dispose();
     _districtCtrl.dispose();
+    _addressCtrl.dispose();
+    _descCtrl.dispose();
     super.dispose();
   }
 
@@ -122,60 +132,64 @@ class _NewComplaintDialogState extends State<_NewComplaintDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('New Complaint'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _customerCtrl,
-                decoration: const InputDecoration(labelText: 'Customer Name'),
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _phoneCtrl,
-                decoration: const InputDecoration(labelText: 'Phone'),
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _deviceCtrl,
-                decoration: const InputDecoration(labelText: 'Device (e.g. AC, Fridge)'),
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _issueCtrl,
-                decoration: const InputDecoration(labelText: 'Issue Description'),
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _districtCtrl,
-                decoration: const InputDecoration(labelText: 'District'),
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<Priority>(
-                value: _priority,
-                decoration: const InputDecoration(labelText: 'Priority'),
-                items: Priority.values.map((p) => DropdownMenuItem(
-                  value: p,
-                  child: Text(p.name[0].toUpperCase() + p.name.substring(1)),
-                )).toList(),
-                onChanged: (p) => setState(() => _priority = p ?? Priority.medium),
-              ),
-            ],
+      content: SizedBox(
+        width: 500,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Customer Details', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: TextFormField(controller: _customerCtrl, decoration: const InputDecoration(labelText: 'Name', isDense: true), validator: (v) => v?.isEmpty ?? true ? 'Required' : null)),
+                    const SizedBox(width: 12),
+                    Expanded(child: TextFormField(controller: _phoneCtrl, decoration: const InputDecoration(labelText: 'Phone', isDense: true), validator: (v) => v?.isEmpty ?? true ? 'Required' : null)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextFormField(controller: _emailCtrl, decoration: const InputDecoration(labelText: 'Email (Optional)', isDense: true)),
+                
+                const SizedBox(height: 20),
+                const Text('Device & Location', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: TextFormField(controller: _brandCtrl, decoration: const InputDecoration(labelText: 'Brand', isDense: true))),
+                    const SizedBox(width: 12),
+                    Expanded(child: TextFormField(controller: _deviceCtrl, decoration: const InputDecoration(labelText: 'Device Type', hintText: 'AC, Fridge', isDense: true), validator: (v) => v?.isEmpty ?? true ? 'Required' : null)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextFormField(controller: _modelCtrl, decoration: const InputDecoration(labelText: 'Model/Serial (Optional)', isDense: true)),
+                const SizedBox(height: 12),
+                TextFormField(controller: _districtCtrl, decoration: const InputDecoration(labelText: 'District', isDense: true), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+                const SizedBox(height: 12),
+                TextFormField(controller: _addressCtrl, decoration: const InputDecoration(labelText: 'Full Address', isDense: true), maxLines: 2),
+
+                const SizedBox(height: 20),
+                const Text('Complaint Info', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<Priority>(
+                  value: _priority,
+                  decoration: const InputDecoration(labelText: 'Priority', isDense: true),
+                  items: Priority.values.map((p) => DropdownMenuItem(value: p, child: Text(p.name[0].toUpperCase() + p.name.substring(1)))).toList(),
+                  onChanged: (p) => setState(() => _priority = p ?? Priority.medium),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(controller: _issueCtrl, decoration: const InputDecoration(labelText: 'Issue Summary', isDense: true), validator: (v) => v?.isEmpty ?? true ? 'Required' : null),
+                const SizedBox(height: 12),
+                TextFormField(controller: _descCtrl, decoration: const InputDecoration(labelText: 'Detailed Description', isDense: true), maxLines: 3),
+              ],
+            ),
           ),
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
         ElevatedButton(
           onPressed: () async {
             if (_formKey.currentState?.validate() ?? false) {
@@ -188,22 +202,22 @@ class _NewComplaintDialogState extends State<_NewComplaintDialog> {
                 customer: Customer(
                   name: _customerCtrl.text.trim(), 
                   phone: _phoneCtrl.text.trim(), 
-                  email: ''
+                  email: _emailCtrl.text.trim(),
                 ),
                 device: Device(
                   type: _deviceCtrl.text.trim(), 
-                  brand: '', 
-                  model: '', 
+                  brand: _brandCtrl.text.trim(), 
+                  model: _modelCtrl.text.trim(), 
                   serial: '', 
                   purchaseDate: '', 
                   warrantyExpiry: ''
                 ),
                 issue: _issueCtrl.text.trim(),
-                description: '',
+                description: _descCtrl.text.trim(),
                 status: ComplaintStatus.pending,
                 priority: _priority,
                 district: _districtCtrl.text.trim(),
-                address: '',
+                address: _addressCtrl.text.trim(),
                 createdAt: DateTime.now(),
                 updatedAt: DateTime.now(),
               );
@@ -218,6 +232,7 @@ class _NewComplaintDialogState extends State<_NewComplaintDialog> {
     );
   }
 }
+
 
 class _Filters extends StatelessWidget {
   final String search;
@@ -426,15 +441,13 @@ class _ComplaintsTable extends StatelessWidget {
 
   DataRow _buildRow(BuildContext context, Complaint c) {
     final techs = context.read<TechniciansProvider>().technicians;
-    final assignedTech = (c.assignedTechnicianId != null && techs.isNotEmpty)
-      ? (techs.where((t) => t.id == c.assignedTechnicianId).firstOrNull ?? techs.first)
-      : null;
+    final assignedTech = techs.where((t) => t.id == c.assignedTechnicianId).firstOrNull;
     final cp = context.read<ComplaintsProvider>();
 
     return DataRow(
       onSelectChanged: (_) => context.go('/app/complaints/${c.id}'),
       cells: [
-        DataCell(Text(c.ticketNo.isEmpty ? 'TKT-NEW' : c.ticketNo, 
+        DataCell(Text(c.ticketNo.isEmpty ? 'ID: ${c.id.substring(c.id.length - 6).toUpperCase()}' : c.ticketNo,
           style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600))),
         DataCell(SizedBox(
           width: 170,
@@ -478,16 +491,25 @@ class _ComplaintsTable extends StatelessWidget {
           const SizedBox(width: 4),
           if (c.status == ComplaintStatus.pending)
             IconButton(icon: const Icon(Icons.check, size: 16, color: AppColors.success),
-              onPressed: () => cp.accept(c.id), tooltip: 'Accept', padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+              onPressed: () {
+                cp.accept(c.id);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complaint accepted')));
+              }, tooltip: 'Accept', padding: EdgeInsets.zero, constraints: const BoxConstraints()),
           const SizedBox(width: 4),
           if (c.status == ComplaintStatus.pending || c.status == ComplaintStatus.active)
             IconButton(icon: const Icon(Icons.close, size: 16, color: AppColors.danger),
-              onPressed: () => RejectModal.show(context, c.id, (r) => cp.reject(c.id, r)),
+              onPressed: () => RejectModal.show(context, c.id, (r) {
+                cp.reject(c.id, r);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complaint rejected')));
+              }),
               tooltip: 'Reject', padding: EdgeInsets.zero, constraints: const BoxConstraints()),
           const SizedBox(width: 4),
           if (c.status == ComplaintStatus.pending || c.status == ComplaintStatus.active)
             IconButton(icon: const Icon(Icons.person_add_outlined, size: 16, color: AppColors.info),
-              onPressed: () => AssignModal.show(context, c.id, (techId) => cp.assign(c.id, techId)),
+              onPressed: () => AssignModal.show(context, c.id, (techId) {
+                cp.assign(c.id, techId);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Technician assigned')));
+              }),
               tooltip: 'Assign', padding: EdgeInsets.zero, constraints: const BoxConstraints()),
           const SizedBox(width: 4),
           IconButton(icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.danger),

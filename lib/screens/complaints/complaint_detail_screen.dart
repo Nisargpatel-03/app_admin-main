@@ -18,20 +18,12 @@ class ComplaintDetailScreen extends StatefulWidget {
   State<ComplaintDetailScreen> createState() => _ComplaintDetailState();
 }
 
-class _ComplaintDetailState extends State<ComplaintDetailScreen> with SingleTickerProviderStateMixin {
-  late TabController _tab;
+class _ComplaintDetailState extends State<ComplaintDetailScreen> {
   final _noteCtrl = TextEditingController();
   final _partCtrl = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    _tab = TabController(length: 4, vsync: this);
-  }
-
-  @override
   void dispose() {
-    _tab.dispose();
     _noteCtrl.dispose();
     _partCtrl.dispose();
     super.dispose();
@@ -74,7 +66,10 @@ class _ComplaintDetailState extends State<ComplaintDetailScreen> with SingleTick
                       style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
                       icon: const Icon(Icons.check, size: 16),
                       label: const Text('Accept'),
-                      onPressed: () => cp.accept(complaint.id),
+                      onPressed: () {
+                        cp.accept(complaint.id);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complaint accepted')));
+                      },
                     ),
                   if (complaint.status == ComplaintStatus.pending || complaint.status == ComplaintStatus.active) ...[
                     const SizedBox(width: 8),
@@ -82,13 +77,19 @@ class _ComplaintDetailState extends State<ComplaintDetailScreen> with SingleTick
                       style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger, side: const BorderSide(color: AppColors.danger)),
                       icon: const Icon(Icons.close, size: 16),
                       label: const Text('Reject'),
-                      onPressed: () => RejectModal.show(context, complaint.id, (r) => cp.reject(complaint.id, r)),
+                      onPressed: () => RejectModal.show(context, complaint.id, (r) {
+                        cp.reject(complaint.id, r);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complaint rejected')));
+                      }),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton.icon(
                       icon: const Icon(Icons.person_add_outlined, size: 16),
                       label: const Text('Assign Technician'),
-                      onPressed: () => AssignModal.show(context, complaint.id, (id) => cp.assign(complaint.id, id)),
+                      onPressed: () => AssignModal.show(context, complaint.id, (id) {
+                        cp.assign(complaint.id, id);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Technician assigned')));
+                      }),
                     ),
                   ],
                 ]),
@@ -99,13 +100,13 @@ class _ComplaintDetailState extends State<ComplaintDetailScreen> with SingleTick
                 // Main content
                 if (isWide)
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Expanded(flex: 2, child: _MainContent(complaint: complaint, tab: _tab, noteCtrl: _noteCtrl, partCtrl: _partCtrl)),
+                    Expanded(flex: 2, child: _MainContent(complaint: complaint, noteCtrl: _noteCtrl, partCtrl: _partCtrl)),
                     const SizedBox(width: 20),
                     SizedBox(width: 280, child: _Sidebar(complaint: complaint)),
                   ])
                 else
                   Column(children: [
-                    _MainContent(complaint: complaint, tab: _tab, noteCtrl: _noteCtrl, partCtrl: _partCtrl),
+                    _MainContent(complaint: complaint, noteCtrl: _noteCtrl, partCtrl: _partCtrl),
                     const SizedBox(height: 20),
                     _Sidebar(complaint: complaint),
                   ]),
@@ -117,6 +118,7 @@ class _ComplaintDetailState extends State<ComplaintDetailScreen> with SingleTick
     );
   }
 }
+
 
 class _StatusBanner extends StatelessWidget {
   final Complaint complaint;
@@ -158,11 +160,30 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-class _MainContent extends StatelessWidget {
+class _MainContent extends StatefulWidget {
   final Complaint complaint;
-  final TabController tab;
   final TextEditingController noteCtrl, partCtrl;
-  const _MainContent({required this.complaint, required this.tab, required this.noteCtrl, required this.partCtrl});
+  const _MainContent({required this.complaint, required this.noteCtrl, required this.partCtrl});
+
+  @override
+  State<_MainContent> createState() => _MainContentState();
+}
+
+class _MainContentState extends State<_MainContent> with SingleTickerProviderStateMixin {
+  late TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 4, vsync: this);
+    _tab.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +193,7 @@ class _MainContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TabBar(
-            controller: tab,
+            controller: _tab,
             isScrollable: true,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             indicatorColor: AppColors.primary,
@@ -180,32 +201,37 @@ class _MainContent extends StatelessWidget {
             unselectedLabelColor: AppColors.gray500,
             tabs: [
               const Tab(text: 'Overview'),
-              Tab(text: 'Activity (${complaint.logs.length})'),
-              Tab(text: 'Parts (${complaint.parts.length})'),
+              Tab(text: 'Activity (${widget.complaint.logs.length})'),
+              Tab(text: 'Parts (${widget.complaint.parts.length})'),
               const Tab(text: 'History'),
             ],
           ),
           const Divider(height: 1, color: AppColors.gray100),
           Padding(
             padding: const EdgeInsets.all(20),
-            child: TabBarView(
-              controller: tab,
-              children: [
-                _OverviewTab(complaint: complaint, noteCtrl: noteCtrl),
-                _ActivityTab(complaint: complaint),
-                _PartsTab(complaint: complaint, partCtrl: partCtrl),
-                const Center(child: Padding(
-                  padding: EdgeInsets.all(40),
-                  child: Text('No previous service history for this device.', style: TextStyle(color: AppColors.gray500)),
-                )),
-              ],
-            ),
+            child: _buildTabContent(),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildTabContent() {
+    return IndexedStack(
+      index: _tab.index,
+      children: [
+        _OverviewTab(complaint: widget.complaint, noteCtrl: widget.noteCtrl),
+        _ActivityTab(complaint: widget.complaint),
+        _PartsTab(complaint: widget.complaint, partCtrl: widget.partCtrl),
+        const Center(child: Padding(
+          padding: EdgeInsets.all(40),
+          child: Text('No previous service history for this device.', style: TextStyle(color: AppColors.gray500)),
+        )),
+      ],
+    );
+  }
 }
+
 
 class _OverviewTab extends StatelessWidget {
   final Complaint complaint;
@@ -224,11 +250,47 @@ class _OverviewTab extends StatelessWidget {
         if (complaint.attachments.isNotEmpty) ...[
           const SizedBox(height: 20),
           Text('Attachments (${complaint.attachments.length})', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, children: complaint.attachments.map((a) => Chip(
-            avatar: const Icon(Icons.attach_file, size: 14),
-            label: Text(a, style: const TextStyle(fontSize: 12)),
-          )).toList()),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 120,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: complaint.attachments.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (ctx, i) {
+                final url = complaint.attachments[i];
+                final isImage = url.toLowerCase().contains('.jpg') || url.toLowerCase().contains('.png') || url.toLowerCase().contains('.jpeg') || url.startsWith('http');
+                
+                return Column(
+                  children: [
+                    Container(
+                      width: 100,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: AppColors.gray100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.gray200),
+                      ),
+                      child: isImage 
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(url, fit: BoxFit.cover, 
+                              errorBuilder: (_, __, ___) => const Icon(Icons.insert_drive_file, color: AppColors.gray400),
+                              loadingBuilder: (_, child, progress) => progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            ),
+                          )
+                        : const Icon(Icons.insert_drive_file, color: AppColors.gray400, size: 32),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: 100,
+                      child: Text(url.split('/').last, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
         ],
         const SizedBox(height: 20),
         const Text('Internal Notes', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
@@ -346,9 +408,7 @@ class _Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final techs = context.watch<TechniciansProvider>().technicians;
-    final assignedTech = complaint.assignedTechnicianId != null
-      ? techs.firstWhere((t) => t.id == complaint.assignedTechnicianId, orElse: () => techs.first)
-      : null;
+    final assignedTech = techs.where((t) => t.id == complaint.assignedTechnicianId).firstOrNull;
     final warrantyValid = DateTime.tryParse(complaint.device.warrantyExpiry)?.isAfter(DateTime.now()) ?? false;
     final cp = context.read<ComplaintsProvider>();
 
