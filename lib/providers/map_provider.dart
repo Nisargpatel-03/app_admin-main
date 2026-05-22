@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../data/mock_data.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:async/async.dart' show StreamZip;
 import '../models/technician.dart';
+import '../models/complaint.dart';
 
 class TechnicianLocation {
   final String technicianId;
@@ -20,12 +22,12 @@ class TechnicianLocation {
     this.heading = 0,
   });
 
-  TechnicianLocation copyWith({LatLng? position, double? heading}) {
+  TechnicianLocation copyWith({LatLng? position, double? heading, TechnicianStatus? status}) {
     return TechnicianLocation(
       technicianId: technicianId,
       name: name,
       position: position ?? this.position,
-      status: status,
+      status: status ?? this.status,
       heading: heading ?? this.heading,
     );
   }
@@ -56,6 +58,7 @@ class CustomerLocation {
 class MapProvider extends ChangeNotifier {
   final _rand = Random();
   Timer? _simulationTimer;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   // Oman coordinates — center of each district
   static const Map<String, LatLng> _districtCoords = {
@@ -72,17 +75,20 @@ class MapProvider extends ChangeNotifier {
     'Qurum':   LatLng(23.5955, 58.3708),
   };
 
-  // Technician starting positions (near their primary district)
+  // Technician starting positions
   static final Map<String, LatLng> _techStartPositions = {
-    't1': const LatLng(23.6020, 58.2100), // Khalid - Muscat/Seeb area
-    't2': const LatLng(22.9500, 57.5200), // Saif - Nizwa area
-    't3': const LatLng(23.7100, 57.8900), // Omar - Barka area
-    't4': const LatLng(24.3600, 56.7500), // Yusuf - Sohar area
-    't5': const LatLng(23.5900, 58.3700), // Hamid - Muscat/Qurum area
+    't1': const LatLng(23.6020, 58.2100),
+    't2': const LatLng(22.9500, 57.5200),
+    't3': const LatLng(23.7100, 57.8900),
+    't4': const LatLng(24.3600, 56.7500),
+    't5': const LatLng(23.5900, 58.3700),
   };
 
   List<TechnicianLocation> _techLocations = [];
   List<CustomerLocation> _customerLocations = [];
+  List<Technician> _technicians = [];
+  List<Complaint> _complaints = [];
+  
   String? _selectedTechId;
   String? _selectedCustomerId;
   bool _showClusters = true;
@@ -100,15 +106,35 @@ class MapProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   MapProvider() {
-    _initLocations();
+    _listenToData();
   }
 
-  void _initLocations() {
-    // Init technician locations
-    _techLocations = MockData.technicians.map((t) {
+  void _listenToData() {
+    StreamZip([
+      _db.collection('technicians').snapshots(),
+      _db.collection('complaints').snapshots(),
+    ]).listen((results) {
+      final techSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>;
+      final complaintSnapshot = results[1] as QuerySnapshot<Map<String, dynamic>>;
+
+      _technicians = techSnapshot.docs.map((doc) => Technician.fromMap(doc.data())).toList();
+      _complaints = complaintSnapshot.docs.map((doc) => Complaint.fromMap(doc.data())).toList();
+
+      _updateLocations();
+    });
+  }
+
+  void _updateLocations() {
+    _techLocations = _technicians.map((t) {
+      final existing = _techLocations.where((tl) => tl.technicianId == t.id).firstOrNull;
+      if (existing != null) {
+        return existing.copyWith(status: t.status);
+      }
+      
       final base = _techStartPositions[t.id] ??
           _districtCoords[t.districts.first] ??
           const LatLng(23.5880, 58.3829);
+          
       return TechnicianLocation(
         technicianId: t.id,
         name: t.name,
@@ -118,15 +144,15 @@ class MapProvider extends ChangeNotifier {
       );
     }).toList();
 
-    // Init customer locations from complaints
-    _customerLocations = MockData.complaints.map((c) {
+    _customerLocations = _complaints.map((c) {
       final base = _districtCoords[c.district] ??
           const LatLng(23.5880, 58.3829);
-      // Add small random offset so pins don't overlap
+      
       final offset = LatLng(
         base.latitude + (_rand.nextDouble() - 0.5) * 0.04,
         base.longitude + (_rand.nextDouble() - 0.5) * 0.04,
       );
+      
       return CustomerLocation(
         complaintId: c.id,
         ticketNo: c.ticketNo,
@@ -142,20 +168,19 @@ class MapProvider extends ChangeNotifier {
     _isLoading = false;
     _buildRoutes();
     notifyListeners();
-
-    // Start real-time simulation for busy/available technicians
-    _startSimulation();
+    
+    if (_simulationTimer == null) {
+      _startSimulation();
+    }
   }
 
   void _startSimulation() {
     _simulationTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       bool changed = false;
-      _techLocations = _techLocations.map((tl) {
-        // Only move busy/available technicians
-        final tech = MockData.technicians.firstWhere((t) => t.id == tl.technicianId);
-        if (tech.status == TechnicianStatus.offline) return tl;
+      _techLocations = _techLocations.map<TechnicianLocation>((tl) {
+        final tech = _technicians.where((t) => t.id == tl.technicianId).firstOrNull;
+        if (tech == null || tech.status == TechnicianStatus.offline) return tl;
 
-        // Small random movement simulating real movement
         final speed = tech.status == TechnicianStatus.busy ? 0.0008 : 0.0003;
         final angle = (tl.heading + (_rand.nextDouble() - 0.5) * 30) % 360;
         final rad = angle * pi / 180;
@@ -180,15 +205,15 @@ class MapProvider extends ChangeNotifier {
     if (!_showRoutes) { _routes = {}; return; }
 
     final polylines = <Polyline>{};
-    // Draw route from each busy technician to their assigned customer
-    for (final job in MockData.scheduledJobs) {
-      final techLoc = _techLocations.where((t) => t.technicianId == job.technicianId).firstOrNull;
-      final custLoc = _customerLocations.where((c) => c.complaintId == job.complaintId).firstOrNull;
+    // Note: scheduledJobs simulation simplified for now to use active complaints
+    for (final complaint in _complaints.where((c) => c.status == ComplaintStatus.active && c.assignedTechnicianId != null)) {
+      final techLoc = _techLocations.where((t) => t.technicianId == complaint.assignedTechnicianId).firstOrNull;
+      final custLoc = _customerLocations.where((c) => c.complaintId == complaint.id).firstOrNull;
       if (techLoc == null || custLoc == null) continue;
 
-      final color = _techColor(job.technicianId);
+      final color = _techColor(complaint.assignedTechnicianId!);
       polylines.add(Polyline(
-        polylineId: PolylineId('route_${job.id}'),
+        polylineId: PolylineId('route_${complaint.id}'),
         points: _buildRoutePoints(techLoc.position, custLoc.position),
         color: color.withOpacity(0.7),
         width: 3,

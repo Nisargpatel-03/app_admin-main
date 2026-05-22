@@ -1,10 +1,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../data/mock_data.dart';
 import '../../models/scheduled_job.dart';
 import '../../models/technician.dart';
 import '../../providers/technicians_provider.dart';
+import '../../providers/scheduled_jobs_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/shared_widgets.dart';
 import '../layout/header_bar.dart';
@@ -81,12 +81,23 @@ class _ScheduleJobDialogState extends State<_ScheduleJobDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             if (_formKey.currentState?.validate() ?? false) {
               _formKey.currentState?.save();
-              // TODO: Add job to provider
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Job scheduled (not yet saved to provider)')));
+              final provider = context.read<ScheduledJobsProvider>();
+              final newJob = ScheduledJob(
+                id: 'j${DateTime.now().millisecondsSinceEpoch}',
+                technicianId: technician!.id,
+                complaintId: 'manual', // or get from a complaint dropdown
+                date: date,
+                time: time,
+                duration: 1.5,
+                customer: customer,
+                district: technician!.districts.first,
+                issue: issue,
+              );
+              await provider.addJob(newJob);
+              if (mounted) Navigator.of(context).pop();
             }
           },
           child: const Text('Schedule'),
@@ -118,7 +129,7 @@ class _SchedulingScreenState extends State<SchedulingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final jobs = MockData.scheduledJobs;
+    final jobs = context.watch<ScheduledJobsProvider>().jobs;
     final techs = context.watch<TechniciansProvider>().technicians;
     final w = MediaQuery.sizeOf(context).width;
 

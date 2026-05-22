@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../../data/mock_data.dart';
+import '../../models/complaint.dart';
+import '../../models/technician.dart';
+import '../../providers/complaints_provider.dart';
 import '../../providers/technicians_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/shared_widgets.dart';
@@ -103,11 +107,16 @@ class _FiltersBar extends StatelessWidget {
 class _KPICards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final complaints = context.watch<ComplaintsProvider>().complaints;
+    final total = complaints.length;
+    final completed = complaints.where((c) => c.status == ComplaintStatus.completed).length;
+    final rate = total > 0 ? (completed / total * 100).toStringAsFixed(1) : '0';
+
     final w = MediaQuery.sizeOf(context).width;
     final isWide = w >= 900;
     final items = [
-      ('Total Complaints', '248', '+12%', AppColors.primary, AppColors.indigo50),
-      ('Completion Rate', '91.6%', '+2.4%', AppColors.success, AppColors.green50),
+      ('Total Complaints', '$total', '', AppColors.primary, AppColors.indigo50),
+      ('Completion Rate', '$rate%', '', AppColors.success, AppColors.green50),
       ('Avg. Response Time', '2.4h', '-18min', AppColors.secondary, AppColors.blue50),
       ('Avg. Satisfaction', '4.7/5', '+0.2', const Color(0xFFF59E0B), const Color(0xFFFFFBEB)),
     ];
@@ -228,13 +237,28 @@ class _OverviewTab extends StatelessWidget {
 class _MonthlyLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final data = MockData.monthlyData;
+    final complaints = context.watch<ComplaintsProvider>().complaints;
+    final now = DateTime.now();
+    final months = List.generate(6, (i) => DateTime(now.year, now.month - (5 - i), 1));
+    
+    final data = months.map((m) {
+      return {
+        'month': DateFormat('MMM').format(m),
+        'complaints': complaints.where((c) => c.createdAt.year == m.year && c.createdAt.month == m.month).length,
+        'resolved': complaints.where((c) => c.createdAt.year == m.year && c.createdAt.month == m.month && c.status == ComplaintStatus.completed).length,
+      };
+    }).toList();
+
     return SizedBox(height: 180, child: LineChart(LineChartData(
       gridData: FlGridData(show: true, drawVerticalLine: false,
         getDrawingHorizontalLine: (_) => const FlLine(color: AppColors.gray100, strokeWidth: 1)),
       titlesData: FlTitlesData(
         bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true,
-          getTitlesWidget: (v, _) => Text(data[v.toInt()]['month'] as String, style: const TextStyle(fontSize: 10, color: AppColors.gray500)))),
+          getTitlesWidget: (v, _) {
+            final idx = v.toInt();
+            if (idx < 0 || idx >= data.length) return const SizedBox.shrink();
+            return Text(data[idx]['month'] as String, style: const TextStyle(fontSize: 10, color: AppColors.gray500));
+          })),
         leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 32,
           getTitlesWidget: (v, _) => Text('${v.toInt()}', style: const TextStyle(fontSize: 9, color: AppColors.gray500)))),
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -256,16 +280,31 @@ class _MonthlyLine extends StatelessWidget {
 class _DistrictBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final data = MockData.districtData.take(6).toList();
+    final complaints = context.watch<ComplaintsProvider>().complaints;
+    final districtCounts = <String, int>{};
+    for (var c in complaints) {
+      districtCounts[c.district] = (districtCounts[c.district] ?? 0) + 1;
+    }
+    
+    final data = districtCounts.entries
+        .map((e) => {'name': e.key, 'count': e.value})
+        .toList()
+      ..sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+    
+    final displayData = data.take(6).toList();
     final colors = [AppColors.primary, AppColors.secondary, AppColors.success, AppColors.warning, AppColors.danger, AppColors.purple500];
     return SizedBox(height: 180, child: BarChart(BarChartData(
-      barGroups: data.asMap().entries.map((e) => BarChartGroupData(x: e.key, barRods: [
-        BarChartRodData(toY: (e.value['count'] as int).toDouble(), color: colors[e.key], width: 24, borderRadius: BorderRadius.circular(4)),
+      barGroups: displayData.asMap().entries.map((e) => BarChartGroupData(x: e.key, barRods: [
+        BarChartRodData(toY: (e.value['count'] as int).toDouble(), color: colors[e.key % colors.length], width: 24, borderRadius: BorderRadius.circular(4)),
       ])).toList(),
       titlesData: FlTitlesData(
         bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true,
-          getTitlesWidget: (v, _) => Text(data[v.toInt()]['name'] as String,
-            style: const TextStyle(fontSize: 9, color: AppColors.gray500), overflow: TextOverflow.ellipsis))),
+          getTitlesWidget: (v, _) {
+            final idx = v.toInt();
+            if (idx < 0 || idx >= displayData.length) return const SizedBox.shrink();
+            return Text(displayData[idx]['name'] as String,
+              style: const TextStyle(fontSize: 9, color: AppColors.gray500), overflow: TextOverflow.ellipsis);
+          })),
         leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -279,39 +318,49 @@ class _DistrictBar extends StatelessWidget {
 class _DevicePie extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final data = MockData.deviceData;
+    final complaints = context.watch<ComplaintsProvider>().complaints;
+    final deviceCounts = <String, int>{};
+    for (var c in complaints) {
+      deviceCounts[c.device.type] = (deviceCounts[c.device.type] ?? 0) + 1;
+    }
+    
+    final data = deviceCounts.entries
+        .map((e) => {'name': e.key, 'count': e.value})
+        .toList()
+      ..sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+
     final colors = [
-      AppColors.primary,
-      AppColors.secondary,
-      AppColors.success,
-      AppColors.warning,
-      AppColors.danger,
-      AppColors.purple500,
+      AppColors.primary, AppColors.secondary, AppColors.success,
+      AppColors.warning, AppColors.danger, AppColors.purple500,
     ];
-    final total = data.fold<int>(0, (s, d) => s + (d['count'] as int));
+    final total = complaints.length;
     return Column(children: [
-      SizedBox(height: 140, child: PieChart(PieChartData(
-        sectionsSpace: 2, centerSpaceRadius: 36,
-        sections: data.asMap().entries.map((e) => PieChartSectionData(
-          value: (e.value['count'] as int).toDouble(), color: colors[e.key], radius: 46, showTitle: false,
-        )).toList(),
-      ))),
-      const SizedBox(height: 12),
-      ...data.asMap().entries.map((e) {
-        final pct = ((e.value['count'] as int) / total * 100).toStringAsFixed(1);
-        return Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [
-          Container(width: 10, height: 10, margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(color: colors[e.key], shape: BoxShape.circle)),
-          Expanded(child: Text(e.value['name'] as String, style: const TextStyle(fontSize: 12))),
-          Text('$pct%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-          const SizedBox(width: 8),
-          SizedBox(width: 80, child: LinearProgressIndicator(
-            value: (e.value['count'] as int) / total,
-            backgroundColor: AppColors.gray100, color: colors[e.key], minHeight: 4,
-            borderRadius: BorderRadius.circular(2),
-          )),
-        ]));
-      }),
+      if (total > 0) ...[
+        SizedBox(height: 140, child: PieChart(PieChartData(
+          sectionsSpace: 2, centerSpaceRadius: 36,
+          sections: data.asMap().entries.map((e) => PieChartSectionData(
+            value: (e.value['count'] as int).toDouble(), color: colors[e.key % colors.length], radius: 46, showTitle: false,
+          )).toList(),
+        ))),
+        const SizedBox(height: 12),
+        ...data.asMap().entries.map((e) {
+          final count = e.value['count'] as int;
+          final pct = (count / total * 100).toStringAsFixed(1);
+          return Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [
+            Container(width: 10, height: 10, margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(color: colors[e.key % colors.length], shape: BoxShape.circle)),
+            Expanded(child: Text(e.value['name'] as String, style: const TextStyle(fontSize: 12))),
+            Text('$pct%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+            SizedBox(width: 80, child: LinearProgressIndicator(
+              value: count / total,
+              backgroundColor: AppColors.gray100, color: colors[e.key % colors.length], minHeight: 4,
+              borderRadius: BorderRadius.circular(2),
+            )),
+          ]));
+        }),
+      ] else
+        const Center(child: Text('No data available')),
     ]);
   }
 }
@@ -319,7 +368,18 @@ class _DevicePie extends StatelessWidget {
 class _WeeklyBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final data = MockData.weeklyData;
+    final complaints = context.watch<ComplaintsProvider>().complaints;
+    final now = DateTime.now();
+    final days = List.generate(7, (i) => now.subtract(Duration(days: 6 - i)));
+    
+    final data = days.map((d) {
+      return {
+        'day': DateFormat('E').format(d),
+        'complaints': complaints.where((c) => c.createdAt.year == d.year && c.createdAt.month == d.month && c.createdAt.day == d.day).length,
+        'resolved': complaints.where((c) => c.createdAt.year == d.year && c.createdAt.month == d.month && c.createdAt.day == d.day && c.status == ComplaintStatus.completed).length,
+      };
+    }).toList();
+
     return SizedBox(height: 160, child: BarChart(BarChartData(
       barGroups: data.asMap().entries.map((e) => BarChartGroupData(x: e.key, barsSpace: 4, barRods: [
         BarChartRodData(toY: (e.value['complaints'] as int).toDouble(), color: AppColors.primary, width: 10, borderRadius: BorderRadius.circular(3)),
@@ -327,7 +387,11 @@ class _WeeklyBar extends StatelessWidget {
       ])).toList(),
       titlesData: FlTitlesData(
         bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true,
-          getTitlesWidget: (v, _) => Text(data[v.toInt()]['day'] as String, style: const TextStyle(fontSize: 10, color: AppColors.gray500)))),
+          getTitlesWidget: (v, _) {
+            final idx = v.toInt();
+            if (idx < 0 || idx >= data.length) return const SizedBox.shrink();
+            return Text(data[idx]['day'] as String, style: const TextStyle(fontSize: 10, color: AppColors.gray500));
+          })),
         leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),

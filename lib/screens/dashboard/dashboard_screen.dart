@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
 import '../../data/mock_data.dart';
 import '../../models/complaint.dart';
 import '../../models/technician.dart';
@@ -73,12 +74,26 @@ class _KPIGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final complaints = context.watch<ComplaintsProvider>().complaints;
+    
+    final total = complaints.length;
+    final pending = complaints.where((c) => c.status == ComplaintStatus.pending).length;
+    final active = complaints.where((c) => c.status == ComplaintStatus.active).length;
+    final completed = complaints.where((c) => c.status == ComplaintStatus.completed).length;
+    final rejected = complaints.where((c) => c.status == ComplaintStatus.rejected).length;
+    
+    final today = DateTime.now();
+    final todayNew = complaints.where((c) => 
+      c.createdAt.year == today.year && 
+      c.createdAt.month == today.month && 
+      c.createdAt.day == today.day).length;
+
     final stats = <(String, String, String, IconData, Color, Color)>[
-      ('Total Complaints',    '248',    '+8 today',  Icons.layers_rounded,          AppColors.primary,          AppColors.indigo50),
-      ('Pending Review',      '45',     '+3 today',  Icons.hourglass_empty_rounded, AppColors.warning,          AppColors.amber50),
-      ('Active / In Progress','72',     '+5 today',  Icons.timelapse_rounded,       AppColors.secondary,        AppColors.blue50),
-      ('Completed',           '118',    '+12 today', Icons.check_circle_rounded,    AppColors.success,          AppColors.green50),
-      ('Rejected',            '13',     '1 today',   Icons.cancel_rounded,          AppColors.danger,           AppColors.red50),
+      ('Total Complaints',    '$total',    '+$todayNew today',  Icons.layers_rounded,          AppColors.primary,          AppColors.indigo50),
+      ('Pending Review',      '$pending',  '',  Icons.hourglass_empty_rounded, AppColors.warning,          AppColors.amber50),
+      ('Active / In Progress','$active',   '',  Icons.timelapse_rounded,       AppColors.secondary,        AppColors.blue50),
+      ('Completed',           '$completed','',  Icons.check_circle_rounded,    AppColors.success,          AppColors.green50),
+      ('Rejected',            '$rejected', '',  Icons.cancel_rounded,          AppColors.danger,           AppColors.red50),
       ('Avg. Satisfaction',   '4.7 ⭐', '+0.2',      Icons.star_rounded,            const Color(0xFFF59E0B),    const Color(0xFFFFFBEB)),
     ];
     return LayoutBuilder(
@@ -137,7 +152,21 @@ class _ChartsRow extends StatelessWidget {
 class _MonthlyChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final data = MockData.monthlyData;
+    final complaints = context.watch<ComplaintsProvider>().complaints;
+    
+    // Simple monthly aggregation for the last 6 months
+    final now = DateTime.now();
+    final months = List.generate(6, (i) => DateTime(now.year, now.month - (5 - i), 1));
+    
+    final data = months.map((m) {
+      final monthComplaints = complaints.where((c) => c.createdAt.year == m.year && c.createdAt.month == m.month).length;
+      final monthResolved = complaints.where((c) => c.createdAt.year == m.year && c.createdAt.month == m.month && c.status == ComplaintStatus.completed).length;
+      return {
+        'month': DateFormat('MMM').format(m),
+        'complaints': monthComplaints,
+        'resolved': monthResolved,
+      };
+    }).toList();
 
     List<FlSpot> spots(String key) => data
         .asMap()
@@ -230,7 +259,17 @@ class _DeviceDonut extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = MockData.deviceData;
+    final complaints = context.watch<ComplaintsProvider>().complaints;
+    final deviceCounts = <String, int>{};
+    for (var c in complaints) {
+      deviceCounts[c.device.type] = (deviceCounts[c.device.type] ?? 0) + 1;
+    }
+    
+    final data = deviceCounts.entries
+        .map((e) => {'name': e.key, 'count': e.value})
+        .toList()
+      ..sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AppTheme.cardDecoration,
@@ -305,7 +344,23 @@ class _SecondRow extends StatelessWidget {
 class _HeatmapCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final data = MockData.districtData;
+    final complaints = context.watch<ComplaintsProvider>().complaints;
+    final districtCounts = <String, int>{};
+    for (var c in complaints) {
+      districtCounts[c.district] = (districtCounts[c.district] ?? 0) + 1;
+    }
+
+    final maxCount = districtCounts.values.fold(0, (max, e) => e > max ? e : max);
+    
+    final data = districtCounts.entries
+        .map((e) => {
+          'name': e.key, 
+          'count': e.value, 
+          'intensity': maxCount > 0 ? e.value / maxCount : 0.0
+        })
+        .toList()
+      ..sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+
     final bp = _DashboardBreakpoints.fromWidth(MediaQuery.sizeOf(context).width);
     return Container(
       padding: const EdgeInsets.all(20),
@@ -372,7 +427,24 @@ class _HeatmapCard extends StatelessWidget {
 class _WeeklyBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final data = MockData.weeklyData;
+    final complaints = context.watch<ComplaintsProvider>().complaints;
+    
+    // Aggregation for the last 7 days
+    final now = DateTime.now();
+    final days = List.generate(7, (i) => now.subtract(Duration(days: 6 - i)));
+    
+    final data = days.map((d) {
+      final dayComplaints = complaints.where((c) => 
+        c.createdAt.year == d.year && c.createdAt.month == d.month && c.createdAt.day == d.day).length;
+      final dayResolved = complaints.where((c) => 
+        c.createdAt.year == d.year && c.createdAt.month == d.month && c.createdAt.day == d.day && c.status == ComplaintStatus.completed).length;
+      return {
+        'day': DateFormat('E').format(d),
+        'complaints': dayComplaints,
+        'resolved': dayResolved,
+      };
+    }).toList();
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AppTheme.cardDecoration,

@@ -1,15 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/technician.dart';
 import '../data/mock_data.dart';
 
 class TechniciansProvider extends ChangeNotifier {
-  late List<Technician> _technicians;
+  List<Technician> _technicians = [];
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  bool _isLoading = true;
 
   TechniciansProvider() {
-    _technicians = List.from(MockData.technicians);
+    _listenToTechnicians();
   }
 
   List<Technician> get technicians => _technicians;
+  bool get isLoading => _isLoading;
+
+  void _listenToTechnicians() {
+    _db.collection('technicians').snapshots().listen((snapshot) async {
+      if (snapshot.docs.isEmpty) {
+        await _seedMockData();
+      } else {
+        _technicians = snapshot.docs.map((doc) => Technician.fromMap(doc.data())).toList();
+        _isLoading = false;
+        notifyListeners();
+      }
+    });
+  }
+
+  Future<void> _seedMockData() async {
+    for (var tech in MockData.technicians) {
+      await _db.collection('technicians').doc(tech.id).set(tech.toMap());
+    }
+  }
 
   Technician? getById(String id) {
     try {
@@ -19,25 +41,26 @@ class TechniciansProvider extends ChangeNotifier {
     }
   }
 
-  void add(Technician tech) {
-    _technicians.add(tech);
-    notifyListeners();
+  Future<void> add(Technician tech) async {
+    await _db.collection('technicians').doc(tech.id).set(tech.toMap());
   }
 
-  void update(String id, {String? name, String? phone, String? email, List<String>? skills, List<String>? districts, TechnicianStatus? status}) {
-    final idx = _technicians.indexWhere((t) => t.id == id);
-    if (idx != -1) {
-      _technicians[idx] = _technicians[idx].copyWith(
-        name: name, phone: phone, email: email,
-        skills: skills, districts: districts, status: status,
-      );
-      notifyListeners();
+  Future<void> update(String id, {String? name, String? phone, String? email, List<String>? skills, List<String>? districts, TechnicianStatus? status}) async {
+    final Map<String, dynamic> updates = {};
+    if (name != null) updates['name'] = name;
+    if (phone != null) updates['phone'] = phone;
+    if (email != null) updates['email'] = email;
+    if (skills != null) updates['skills'] = skills;
+    if (districts != null) updates['districts'] = districts;
+    if (status != null) updates['status'] = status.name;
+
+    if (updates.isNotEmpty) {
+      await _db.collection('technicians').doc(id).update(updates);
     }
   }
 
-  void delete(String id) {
-    _technicians.removeWhere((t) => t.id == id);
-    notifyListeners();
+  Future<void> delete(String id) async {
+    await _db.collection('technicians').doc(id).delete();
   }
 
   void cycleStatus(String id) {

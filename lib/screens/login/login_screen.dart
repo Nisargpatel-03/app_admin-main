@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import 'widgets/otp_input_row.dart';
@@ -12,9 +13,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailCtrl = TextEditingController(text: 'admin@techserve.com');
-  final _passCtrl = TextEditingController(text: 'admin123');
-  final _phoneCtrl = TextEditingController(text: '+968 9000 0000');
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
   bool _obscure = true;
   String _otpValue = '';
   bool _rememberMe = false;
@@ -55,13 +56,13 @@ class _LoginScreenState extends State<LoginScreen> {
     color: AppColors.slate900,
     child: Stack(
       children: [
-        Positioned(top: -80, left: -80, child: _glow(220, AppColors.primary.withOpacity(0.15))),
-        Positioned(bottom: -70, right: -40, child: _glow(180, AppColors.indigo600.withOpacity(0.12))),
+        Positioned(top: -80, left: -80, child: _glow(220, AppColors.primary.withAlpha(38))),
+        Positioned(bottom: -70, right: -40, child: _glow(180, AppColors.indigo600.withAlpha(30))),
         Positioned.fill(child: CustomPaint(painter: _GridPainter())),
         Center(
-          child: Row(
+          child: const Row(
             mainAxisSize: MainAxisSize.min,
-            children: const [
+            children: [
               Icon(Icons.build_rounded, color: Colors.white, size: 32),
               SizedBox(width: 12),
               Text(
@@ -82,13 +83,10 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _leftPanel() => Container(
     color: AppColors.slate900,
     child: Stack(children: [
-      // Background orbs
-      Positioned(top: -80, left: -80, child: _glow(300, AppColors.primary.withOpacity(0.15))),
-      Positioned(bottom: 100, right: -60, child: _glow(250, AppColors.indigo600.withOpacity(0.12))),
-      Positioned(top: 200, right: 60, child: _glow(180, AppColors.secondary.withOpacity(0.1))),
-      // Grid overlay
+      Positioned(top: -80, left: -80, child: _glow(300, AppColors.primary.withAlpha(38))),
+      Positioned(bottom: 100, right: -60, child: _glow(250, AppColors.indigo600.withAlpha(30))),
+      Positioned(top: 200, right: 60, child: _glow(180, AppColors.secondary.withAlpha(25))),
       Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-      // Content
       Padding(
         padding: const EdgeInsets.all(48),
         child: Column(
@@ -106,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 .animate().slideX(begin: -0.3).fadeIn(delay: 100.ms),
             const SizedBox(height: 12),
             Text('Complete field service management platform for home appliance repair companies.',
-              style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 15, height: 1.6))
+              style: TextStyle(color: Colors.white.withAlpha(180), fontSize: 15, height: 1.6))
                 .animate().fadeIn(delay: 200.ms),
             const SizedBox(height: 40),
             ...[
@@ -120,11 +118,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Container(
                     width: 24, height: 24,
-                    decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.2), shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: AppColors.primary.withAlpha(50), shape: BoxShape.circle),
                     child: const Icon(Icons.check, color: AppColors.primary, size: 14),
                   ),
                   const SizedBox(width: 12),
-                  Text(e.value, style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 14)),
+                  Text(e.value, style: TextStyle(color: Colors.white.withAlpha(217), fontSize: 14)),
                 ],
               ),
             ).animate().slideX(begin: -0.2).fadeIn(delay: Duration(milliseconds: 300 + e.key * 80))),
@@ -166,7 +164,6 @@ class _LoginScreenState extends State<LoginScreen> {
         const Text('Sign in to your admin account', style: TextStyle(color: AppColors.gray500, fontSize: 15))
           .animate().fadeIn(delay: 100.ms),
         const SizedBox(height: 32),
-        // Method toggle
         Container(
           decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(12)),
           padding: const EdgeInsets.all(4),
@@ -203,44 +200,42 @@ class _LoginScreenState extends State<LoginScreen> {
             decoration: const InputDecoration(prefixIcon: Icon(Icons.smartphone_outlined), labelText: 'Phone Number'),
           ),
         const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isTight = constraints.maxWidth < 360;
-            if (isTight) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Checkbox(value: _rememberMe, onChanged: (v) => setState(() => _rememberMe = v!), activeColor: AppColors.primary),
-                      const Text('Remember me', style: TextStyle(fontSize: 14, color: AppColors.gray600)),
-                    ],
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: () {},
-                      child: const Text('Forgot password?', style: TextStyle(color: AppColors.primary)),
-                    ),
-                  ),
-                ],
-              );
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(children: [
+              Checkbox(value: _rememberMe, onChanged: (v) => setState(() => _rememberMe = v!), activeColor: AppColors.primary),
+              const Text('Remember me', style: TextStyle(fontSize: 14, color: AppColors.gray600)),
+            ]),
+            TextButton(onPressed: () {}, child: const Text('Forgot password?', style: TextStyle(color: AppColors.primary))),
+          ],
+        ),
+        const SizedBox(height: 24),
+        AppLoadingButton(
+          label: auth.method == LoginMethod.email ? 'Sign In' : 'Continue',
+          isLoading: auth.isLoading,
+          onPressed: () async {
+            try {
+              if (auth.method == LoginMethod.email) {
+                await auth.signInWithEmail(_emailCtrl.text, _passCtrl.text);
+              } else {
+                await auth.sendOtp(_phoneCtrl.text);
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+              }
             }
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(children: [
-                  Checkbox(value: _rememberMe, onChanged: (v) => setState(() => _rememberMe = v!), activeColor: AppColors.primary),
-                  const Text('Remember me', style: TextStyle(fontSize: 14, color: AppColors.gray600)),
-                ]),
-                TextButton(onPressed: () {}, child: const Text('Forgot password?', style: TextStyle(color: AppColors.primary))),
-              ],
-            );
           },
         ),
         const SizedBox(height: 24),
-        AppLoadingButton(label: 'Continue', isLoading: auth.isLoading, onPressed: auth.sendOtp),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text("Don't have an account?"),
+            TextButton(onPressed: () => context.go('/register'), child: const Text('Register')),
+          ],
+        ),
       ].animate(interval: 50.ms).slideY(begin: 0.2).fadeIn(),
     );
   }
@@ -283,17 +278,6 @@ class _LoginScreenState extends State<LoginScreen> {
         Center(child: Text('Enter the 6-digit code sent to your ${auth.method == LoginMethod.email ? "email" : "mobile"}',
           textAlign: TextAlign.center,
           style: const TextStyle(color: AppColors.gray500, fontSize: 14))),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(color: AppColors.green50, borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.green600.withOpacity(0.3))),
-          child: Row(children: [
-            const Icon(Icons.check_circle_outline, color: AppColors.green600, size: 18),
-            const SizedBox(width: 8),
-            const Text('OTP sent successfully', style: TextStyle(color: AppColors.green600, fontSize: 14, fontWeight: FontWeight.w500)),
-          ]),
-        ),
         const SizedBox(height: 32),
         OTPInputRow(onCompleted: (val) => setState(() => _otpValue = val)),
         const SizedBox(height: 32),
@@ -313,7 +297,7 @@ class _LoginScreenState extends State<LoginScreen> {
               label: const Text('Back'),
               onPressed: auth.goBack,
             ),
-            TextButton(onPressed: auth.sendOtp, child: const Text('Resend code')),
+            TextButton(onPressed: () => auth.sendOtp(_phoneCtrl.text), child: const Text('Resend code')),
           ],
         ),
       ],
@@ -345,7 +329,7 @@ class AppLoadingButton extends StatelessWidget {
 class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white.withOpacity(0.03)..strokeWidth = 1;
+    final paint = Paint()..color = Colors.white.withAlpha(8)..strokeWidth = 1;
     for (double x = 0; x < size.width; x += 40) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }

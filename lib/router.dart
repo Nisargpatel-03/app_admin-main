@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'providers/auth_provider.dart';
+import 'screens/splash_screen.dart';
 import 'screens/login/login_screen.dart';
+import 'screens/login/register_screen.dart';
 import 'screens/layout/adaptive_scaffold.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/complaints/complaints_list_screen.dart';
@@ -18,17 +20,31 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 GoRouter createRouter(AuthProvider auth) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/',
+    initialLocation: '/splash',
     redirect: (context, state) {
+      if (!auth.isInitialized) return '/splash';
+
       final isLoggedIn = auth.isLoggedIn;
       final isLoginRoute = state.matchedLocation == '/';
-      if (!isLoggedIn && !isLoginRoute) return '/';
-      if (isLoggedIn && isLoginRoute) return '/app/dashboard';
+      final isRegisterRoute = state.matchedLocation == '/register';
+      final isSplashRoute = state.matchedLocation == '/splash';
+      
+      if (!isLoggedIn) {
+        if (isLoginRoute || isRegisterRoute) return null;
+        return '/';
+      }
+      
+      if (isLoggedIn && (isLoginRoute || isRegisterRoute || isSplashRoute)) {
+        return '/app/dashboard';
+      }
+      
       return null;
     },
     refreshListenable: auth,
     routes: [
+      GoRoute(path: '/splash', builder: (ctx, state) => const SplashScreen()),
       GoRoute(path: '/', builder: (ctx, state) => const LoginScreen()),
+      GoRoute(path: '/register', builder: (ctx, state) => const RegisterScreen()),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (ctx, state, child) => AdaptiveScaffold(child: child),

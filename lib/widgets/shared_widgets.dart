@@ -82,9 +82,15 @@ class TechnicianAvatar extends StatelessWidget {
   const TechnicianAvatar({super.key, required this.name, this.size = 40, this.status});
 
   String get initials {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return name.substring(0, 2).toUpperCase();
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '??';
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return trimmed.length >= 2 
+        ? trimmed.substring(0, 2).toUpperCase() 
+        : trimmed.toUpperCase();
   }
 
   @override

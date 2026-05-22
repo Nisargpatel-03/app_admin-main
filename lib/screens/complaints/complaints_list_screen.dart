@@ -101,12 +101,22 @@ class _NewComplaintDialog extends StatefulWidget {
 
 class _NewComplaintDialogState extends State<_NewComplaintDialog> {
   final _formKey = GlobalKey<FormState>();
-  String customer = '';
-  String phone = '';
-  String device = '';
-  String issue = '';
-  String district = '';
-  Priority priority = Priority.medium;
+  final _customerCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _deviceCtrl = TextEditingController();
+  final _issueCtrl = TextEditingController();
+  final _districtCtrl = TextEditingController();
+  Priority _priority = Priority.medium;
+
+  @override
+  void dispose() {
+    _customerCtrl.dispose();
+    _phoneCtrl.dispose();
+    _deviceCtrl.dispose();
+    _issueCtrl.dispose();
+    _districtCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -119,38 +129,43 @@ class _NewComplaintDialogState extends State<_NewComplaintDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
+                controller: _customerCtrl,
                 decoration: const InputDecoration(labelText: 'Customer Name'),
                 validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                onSaved: (v) => customer = v ?? '',
               ),
+              const SizedBox(height: 12),
               TextFormField(
+                controller: _phoneCtrl,
                 decoration: const InputDecoration(labelText: 'Phone'),
                 validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                onSaved: (v) => phone = v ?? '',
               ),
+              const SizedBox(height: 12),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Device'),
+                controller: _deviceCtrl,
+                decoration: const InputDecoration(labelText: 'Device (e.g. AC, Fridge)'),
                 validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                onSaved: (v) => device = v ?? '',
               ),
+              const SizedBox(height: 12),
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Issue'),
+                controller: _issueCtrl,
+                decoration: const InputDecoration(labelText: 'Issue Description'),
                 validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                onSaved: (v) => issue = v ?? '',
               ),
+              const SizedBox(height: 12),
               TextFormField(
+                controller: _districtCtrl,
                 decoration: const InputDecoration(labelText: 'District'),
                 validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                onSaved: (v) => district = v ?? '',
               ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<Priority>(
-                value: priority,
+                value: _priority,
                 decoration: const InputDecoration(labelText: 'Priority'),
                 items: Priority.values.map((p) => DropdownMenuItem(
                   value: p,
                   child: Text(p.name[0].toUpperCase() + p.name.substring(1)),
                 )).toList(),
-                onChanged: (p) => setState(() => priority = p ?? Priority.medium),
+                onChanged: (p) => setState(() => _priority = p ?? Priority.medium),
               ),
             ],
           ),
@@ -162,12 +177,39 @@ class _NewComplaintDialogState extends State<_NewComplaintDialog> {
           child: const Text('Cancel'),
         ),
         ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             if (_formKey.currentState?.validate() ?? false) {
-              _formKey.currentState?.save();
-              // TODO: Add complaint to provider
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Complaint created (not yet saved to provider)')));
+              final provider = context.read<ComplaintsProvider>();
+              final id = 'c${DateTime.now().millisecondsSinceEpoch}';
+              
+              final newComplaint = Complaint(
+                id: id,
+                ticketNo: 'TKT-${DateFormat('yyyyMMdd').format(DateTime.now())}-${id.substring(id.length - 4)}',
+                customer: Customer(
+                  name: _customerCtrl.text.trim(), 
+                  phone: _phoneCtrl.text.trim(), 
+                  email: ''
+                ),
+                device: Device(
+                  type: _deviceCtrl.text.trim(), 
+                  brand: '', 
+                  model: '', 
+                  serial: '', 
+                  purchaseDate: '', 
+                  warrantyExpiry: ''
+                ),
+                issue: _issueCtrl.text.trim(),
+                description: '',
+                status: ComplaintStatus.pending,
+                priority: _priority,
+                district: _districtCtrl.text.trim(),
+                address: '',
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              );
+              
+              await provider.addComplaint(newComplaint);
+              if (mounted) Navigator.of(context).pop();
             }
           },
           child: const Text('Create'),
@@ -175,7 +217,6 @@ class _NewComplaintDialogState extends State<_NewComplaintDialog> {
       ],
     );
   }
-
 }
 
 class _Filters extends StatelessWidget {
@@ -385,36 +426,41 @@ class _ComplaintsTable extends StatelessWidget {
 
   DataRow _buildRow(BuildContext context, Complaint c) {
     final techs = context.read<TechniciansProvider>().technicians;
-    final assignedTech = c.assignedTechnicianId != null
-      ? techs.firstWhere((t) => t.id == c.assignedTechnicianId, orElse: () => techs.first)
+    final assignedTech = (c.assignedTechnicianId != null && techs.isNotEmpty)
+      ? (techs.where((t) => t.id == c.assignedTechnicianId).firstOrNull ?? techs.first)
       : null;
     final cp = context.read<ComplaintsProvider>();
 
     return DataRow(
       onSelectChanged: (_) => context.go('/app/complaints/${c.id}'),
       cells: [
-        DataCell(Text(c.ticketNo, style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600))),
+        DataCell(Text(c.ticketNo.isEmpty ? 'TKT-NEW' : c.ticketNo, 
+          style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600))),
         DataCell(SizedBox(
           width: 170,
           child: Row(children: [
-            TechnicianAvatar(name: c.customer.name, size: 32),
+            TechnicianAvatar(name: c.customer.name.isEmpty ? 'Unknown' : c.customer.name, size: 32),
             const SizedBox(width: 8),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(c.customer.name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-                Text(c.customer.phone, style: const TextStyle(fontSize: 11, color: AppColors.gray500), overflow: TextOverflow.ellipsis),
+                Text(c.customer.name.isEmpty ? 'No Name' : c.customer.name, 
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                Text(c.customer.phone.isEmpty ? 'No Phone' : c.customer.phone, 
+                  style: const TextStyle(fontSize: 11, color: AppColors.gray500), overflow: TextOverflow.ellipsis),
               ]),
             ),
           ]),
         )),
         DataCell(SizedBox(width: 160, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${c.device.brand} ${c.device.type}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-          Text(c.issue, style: const TextStyle(fontSize: 11, color: AppColors.gray500), overflow: TextOverflow.ellipsis),
+          Text(c.device.type.isEmpty ? 'Unknown Device' : '${c.device.brand} ${c.device.type}'.trim(), 
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+          Text(c.issue.isEmpty ? 'No issue described' : c.issue, 
+            style: const TextStyle(fontSize: 11, color: AppColors.gray500), overflow: TextOverflow.ellipsis),
         ]))),
         DataCell(Row(children: [
           const Icon(Icons.location_on_outlined, size: 12, color: AppColors.gray400),
           const SizedBox(width: 4),
-          Text(c.district, style: const TextStyle(fontSize: 12)),
+          Text(c.district.isEmpty ? 'No District' : c.district, style: const TextStyle(fontSize: 12)),
         ])),
         DataCell(PriorityBadge(priority: c.priority)),
         DataCell(StatusBadge(status: c.status)),
@@ -443,8 +489,32 @@ class _ComplaintsTable extends StatelessWidget {
             IconButton(icon: const Icon(Icons.person_add_outlined, size: 16, color: AppColors.info),
               onPressed: () => AssignModal.show(context, c.id, (techId) => cp.assign(c.id, techId)),
               tooltip: 'Assign', padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+          const SizedBox(width: 4),
+          IconButton(icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.danger),
+            onPressed: () => _confirmDelete(context, cp, c.id), tooltip: 'Delete', padding: EdgeInsets.zero, constraints: const BoxConstraints()),
         ])),
       ],
+    );
+  }
+
+  void _confirmDelete(BuildContext context, ComplaintsProvider cp, String id) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Complaint'),
+        content: const Text('Are you sure you want to permanently delete this complaint record?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () {
+              cp.deleteComplaint(id);
+              Navigator.pop(context);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 }

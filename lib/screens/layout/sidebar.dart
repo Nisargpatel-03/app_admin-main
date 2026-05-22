@@ -108,26 +108,33 @@ class Sidebar extends StatelessWidget {
           // User section only
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 38, height: 38,
-                  decoration: const BoxDecoration(color: AppColors.indigo100, shape: BoxShape.circle),
-                  child: const Center(child: Text('AA', style: TextStyle(color: AppColors.primary, fontSize: 14, fontWeight: FontWeight.w700))),
-                ),
-                const SizedBox(height: 6),
-                const Text('Admin User', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray800)),
-                const Text('Super Admin', style: TextStyle(fontSize: 11, color: AppColors.gray500)),
-                const SizedBox(height: 10),
-                IconButton(
-                  icon: const Icon(Icons.logout_rounded, size: 18, color: AppColors.gray400),
-                  onPressed: () => context.read<AuthProvider>().logout(),
-                  tooltip: 'Logout',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
+            child: Consumer<AuthProvider>(
+              builder: (context, auth, _) {
+                final email = auth.user?.email ?? 'Admin User';
+                final name = auth.adminData?['name'] ?? 'Admin User';
+                final initial = name.isNotEmpty ? name[0].toUpperCase() : 'A';
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 38, height: 38,
+                      decoration: const BoxDecoration(color: AppColors.indigo100, shape: BoxShape.circle),
+                      child: Center(child: Text(initial, style: const TextStyle(color: AppColors.primary, fontSize: 14, fontWeight: FontWeight.w700))),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray800), textAlign: TextAlign.center),
+                    Text(email, style: const TextStyle(fontSize: 10, color: AppColors.gray500), textAlign: TextAlign.center),
+                    const SizedBox(height: 10),
+                    IconButton(
+                      icon: const Icon(Icons.logout_rounded, size: 18, color: AppColors.gray400),
+                      onPressed: () => auth.logout(),
+                      tooltip: 'Logout',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
