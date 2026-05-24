@@ -76,7 +76,7 @@ class _RaiseComplaintScreenState extends State<RaiseComplaintScreen> {
       initialDate: DateTime.now(),
     );
 
-    if (date == null) return;
+    if (date == null || !mounted) return;
 
     final time = await showTimePicker(
       context: context,
@@ -108,9 +108,9 @@ class _RaiseComplaintScreenState extends State<RaiseComplaintScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            FadeInWidget(
+            const FadeInWidget(
               delay: 100,
-              child: const Text(
+              child: Text(
                 "Create Electricity Complaint",
                 style: TextStyle(
                   fontSize: 22,
