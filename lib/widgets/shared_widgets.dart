@@ -23,7 +23,7 @@ class StatusBadge extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(50),
-          border: Border.all(color: border.withOpacity(0.4)),
+          border: Border.all(color: border.withValues(alpha: 0.4)),
         ),
         child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg)),
       ),
@@ -46,9 +46,9 @@ class PriorityBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(50),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
     );
@@ -70,7 +70,7 @@ class StatusDot extends StatelessWidget {
     return Container(
       width: size, height: size,
       decoration: BoxDecoration(color: color, shape: BoxShape.circle,
-        boxShadow: [BoxShadow(color: color.withOpacity(0.4), blurRadius: 4, spreadRadius: 1)]),
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4, spreadRadius: 1)]),
     );
   }
 }

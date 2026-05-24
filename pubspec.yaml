@@ -23,8 +23,6 @@ dependencies:
   flutter_animate: ^4.5.0
   google_maps_flutter: ^2.6.0
   google_maps_flutter_web: ^0.5.4
-  image_picker: ^1.1.2
-  file_picker: ^8.0.3
 
 dev_dependencies:
   flutter_test:

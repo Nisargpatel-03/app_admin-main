@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import '../../data/mock_data.dart';
 import '../../models/complaint.dart';
 import '../../models/technician.dart';
 import '../../providers/complaints_provider.dart';

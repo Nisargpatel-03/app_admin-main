@@ -164,7 +164,7 @@ class _TechCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: isSelected ? AppColors.primary : AppColors.gray100, width: isSelected ? 2 : 1),
-          boxShadow: isSelected ? [BoxShadow(color: AppColors.primary.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 2))] : [],
+          boxShadow: isSelected ? [BoxShadow(color: AppColors.primary.withAlpha((0.15 * 255).round()), blurRadius: 8, offset: const Offset(0, 2))] : [],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
