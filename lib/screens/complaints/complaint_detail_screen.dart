@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../models/complaint.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/complaints_provider.dart';
 import '../../providers/technicians_provider.dart';
 import '../../theme/app_theme.dart';
@@ -21,11 +22,13 @@ class ComplaintDetailScreen extends StatefulWidget {
 class _ComplaintDetailState extends State<ComplaintDetailScreen> {
   final _noteCtrl = TextEditingController();
   final _partCtrl = TextEditingController();
+  final _chatCtrl = TextEditingController();
 
   @override
   void dispose() {
     _noteCtrl.dispose();
     _partCtrl.dispose();
+    _chatCtrl.dispose();
     super.dispose();
   }
 
@@ -100,13 +103,13 @@ class _ComplaintDetailState extends State<ComplaintDetailScreen> {
                 // Main content
                 if (isWide)
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Expanded(flex: 2, child: _MainContent(complaint: complaint, noteCtrl: _noteCtrl, partCtrl: _partCtrl)),
+                    Expanded(flex: 2, child: _MainContent(complaint: complaint, noteCtrl: _noteCtrl, partCtrl: _partCtrl, chatCtrl: _chatCtrl)),
                     const SizedBox(width: 20),
                     SizedBox(width: 280, child: _Sidebar(complaint: complaint)),
                   ])
                 else
                   Column(children: [
-                    _MainContent(complaint: complaint, noteCtrl: _noteCtrl, partCtrl: _partCtrl),
+                    _MainContent(complaint: complaint, noteCtrl: _noteCtrl, partCtrl: _partCtrl, chatCtrl: _chatCtrl),
                     const SizedBox(height: 20),
                     _Sidebar(complaint: complaint),
                   ]),
@@ -118,6 +121,7 @@ class _ComplaintDetailState extends State<ComplaintDetailScreen> {
     );
   }
 }
+
 
 
 class _StatusBanner extends StatelessWidget {
@@ -162,8 +166,8 @@ class _StatusBanner extends StatelessWidget {
 
 class _MainContent extends StatefulWidget {
   final Complaint complaint;
-  final TextEditingController noteCtrl, partCtrl;
-  const _MainContent({required this.complaint, required this.noteCtrl, required this.partCtrl});
+  final TextEditingController noteCtrl, partCtrl, chatCtrl;
+  const _MainContent({required this.complaint, required this.noteCtrl, required this.partCtrl, required this.chatCtrl});
 
   @override
   State<_MainContent> createState() => _MainContentState();
@@ -175,7 +179,7 @@ class _MainContentState extends State<_MainContent> with SingleTickerProviderSta
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 4, vsync: this);
+    _tab = TabController(length: 5, vsync: this);
     _tab.addListener(() => setState(() {}));
   }
 
@@ -201,6 +205,7 @@ class _MainContentState extends State<_MainContent> with SingleTickerProviderSta
             unselectedLabelColor: AppColors.gray500,
             tabs: [
               const Tab(text: 'Overview'),
+              Tab(text: 'Customer Chat (${widget.complaint.messages.length})'),
               Tab(text: 'Activity (${widget.complaint.logs.length})'),
               Tab(text: 'Parts (${widget.complaint.parts.length})'),
               const Tab(text: 'History'),
@@ -221,6 +226,7 @@ class _MainContentState extends State<_MainContent> with SingleTickerProviderSta
       index: _tab.index,
       children: [
         _OverviewTab(complaint: widget.complaint, noteCtrl: widget.noteCtrl),
+        _ChatTab(complaint: widget.complaint, chatCtrl: widget.chatCtrl),
         _ActivityTab(complaint: widget.complaint),
         _PartsTab(complaint: widget.complaint, partCtrl: widget.partCtrl),
         const Center(child: Padding(
@@ -231,6 +237,96 @@ class _MainContentState extends State<_MainContent> with SingleTickerProviderSta
     );
   }
 }
+
+class _ChatTab extends StatelessWidget {
+  final Complaint complaint;
+  final TextEditingController chatCtrl;
+  const _ChatTab({required this.complaint, required this.chatCtrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final cp = context.read<ComplaintsProvider>();
+    final auth = context.read<AuthProvider>();
+    final adminName = auth.adminData?['name'] ?? 'Admin';
+    final adminId = auth.user?.uid ?? 'admin';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Communication with Customer', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 16),
+        if (complaint.messages.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(child: Text('No messages yet. Send a note to the customer.', style: TextStyle(color: AppColors.gray400))),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: complaint.messages.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (ctx, i) {
+              final m = complaint.messages[i];
+              final isMe = m.senderRole == 'admin';
+              return Align(
+                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.6),
+                  decoration: BoxDecoration(
+                    color: isMe ? AppColors.primary : AppColors.gray100,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(12),
+                      topRight: const Radius.circular(12),
+                      bottomLeft: isMe ? const Radius.circular(12) : Radius.zero,
+                      bottomRight: isMe ? Radius.zero : const Radius.circular(12),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(m.senderName, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isMe ? Colors.white70 : AppColors.gray500)),
+                      const SizedBox(height: 4),
+                      Text(m.message, style: TextStyle(fontSize: 14, color: isMe ? Colors.white : AppColors.gray800)),
+                      const SizedBox(height: 4),
+                      Text(DateFormat('hh:mm a').format(m.time), style: TextStyle(fontSize: 10, color: isMe ? Colors.white60 : AppColors.gray400)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        const SizedBox(height: 20),
+        const Divider(),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: TextField(
+            controller: chatCtrl,
+            decoration: const InputDecoration(hintText: 'Type a message to user...', isDense: true),
+            onSubmitted: (v) {
+              if (v.trim().isNotEmpty) {
+                cp.sendMessageToCustomer(complaint.id, v.trim(), adminId, adminName, 'admin');
+                chatCtrl.clear();
+              }
+            },
+          )),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () {
+              if (chatCtrl.text.trim().isNotEmpty) {
+                cp.sendMessageToCustomer(complaint.id, chatCtrl.text.trim(), adminId, adminName, 'admin');
+                chatCtrl.clear();
+              }
+            },
+            child: const Icon(Icons.send, size: 16),
+          ),
+        ]),
+      ],
+    );
+  }
+}
+
 
 
 class _OverviewTab extends StatelessWidget {

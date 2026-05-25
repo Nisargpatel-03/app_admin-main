@@ -9,6 +9,8 @@ import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/complaints/complaints_list_screen.dart';
 import 'screens/complaints/complaint_detail_screen.dart';
 import 'screens/technicians/technician_management_screen.dart';
+import 'screens/customers/customer_management_screen.dart';
+import 'screens/customers/customer_detail_screen.dart';
 import 'screens/scheduling/scheduling_screen.dart';
 import 'screens/map/map_screen.dart';
 import 'screens/reports/reports_screen.dart';
@@ -53,6 +55,8 @@ GoRouter createRouter(AuthProvider auth) {
           GoRoute(path: '/app/complaints', builder: (ctx, state) => const ComplaintsListScreen()),
           GoRoute(path: '/app/complaints/:id', builder: (ctx, state) => ComplaintDetailScreen(id: state.pathParameters['id']!)),
           GoRoute(path: '/app/technicians', builder: (ctx, state) => const TechnicianManagementScreen()),
+          GoRoute(path: '/app/customers', builder: (ctx, state) => const CustomerManagementScreen()),
+          GoRoute(path: '/app/customers/:id', builder: (ctx, state) => CustomerDetailScreen(userId: state.pathParameters['id']!)),
           GoRoute(path: '/app/scheduling', builder: (ctx, state) => const SchedulingScreen()),
           GoRoute(path: '/app/map', builder: (ctx, state) => const MapScreen()),
           GoRoute(path: '/app/reports', builder: (ctx, state) => const ReportsScreen()),

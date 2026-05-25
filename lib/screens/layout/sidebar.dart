@@ -14,6 +14,7 @@ const _navItems = [
   _NavItem('Dashboard', '/app/dashboard', Icons.dashboard_rounded),
   _NavItem('Complaints', '/app/complaints', Icons.report_problem_rounded),
   _NavItem('Technicians', '/app/technicians', Icons.engineering_rounded),
+  _NavItem('Customers', '/app/customers', Icons.people_rounded),
   _NavItem('Scheduling', '/app/scheduling', Icons.calendar_month_rounded),
   _NavItem('Live Map', '/app/map', Icons.map_rounded),
   _NavItem('Reports', '/app/reports', Icons.bar_chart_rounded),

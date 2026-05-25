@@ -75,13 +75,23 @@ class ComplaintsProvider extends ChangeNotifier {
     final c = getById(id);
     if (c != null) {
       final updatedNotes = List<String>.from(c.notes)..add('Rejection reason: $reason');
+      
+      final newMessage = ComplaintMessage(
+        senderId: 'admin',
+        senderName: 'Admin',
+        message: 'Your complaint has been rejected. Reason: $reason',
+        senderRole: 'admin',
+        time: DateTime.now(),
+      );
+
       final updatedLogs = List<LogEntry>.from(c.logs)
         ..add(LogEntry(time: DateTime.now(), action: 'Complaint rejected: $reason', by: 'Admin'));
 
       await _db.collection('complaints').doc(id).update({
-        'status': ComplaintStatus.rejected.name,
+        'status': 'Rejected', // Use capitalized to match Customer App expectation
         'updatedAt': Timestamp.now(),
         'notes': updatedNotes,
+        'messages': FieldValue.arrayUnion([newMessage.toMap()]),
         'logs': updatedLogs.map((l) => l.toMap()).toList(),
       });
     }
@@ -104,7 +114,35 @@ class ComplaintsProvider extends ChangeNotifier {
         updates['status'] = ComplaintStatus.active.name;
       }
 
-      await _db.collection('complaints').doc(id).update(updates);
+      final batch = _db.batch();
+
+      // 1. Update the complaint document
+      batch.update(_db.collection('complaints').doc(id), updates);
+
+      // 2. Create a notification record for the technician app to listen to
+      final notificationId = 'notif_${DateTime.now().millisecondsSinceEpoch}';
+      batch.set(_db.collection('notifications').doc(notificationId), {
+        'id': notificationId,
+        'recipientId': techId,
+        'type': 'new_assignment',
+        'title': 'New Complaint Assigned',
+        'body': 'You have been assigned a new complaint: ${c.ticketNo}',
+        'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+        'data': {
+          'complaintId': id,
+          'ticketNo': c.ticketNo,
+        },
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      // 3. Update the technician's record: increment active jobs and set status to busy
+      batch.update(_db.collection('technicians').doc(techId), {
+        'activeJobs': FieldValue.increment(1),
+        'status': 'busy',
+      });
+
+      await batch.commit();
     }
   }
 
@@ -150,5 +188,20 @@ class ComplaintsProvider extends ChangeNotifier {
         'logs': updatedLogs.map((l) => l.toMap()).toList(),
       });
     }
+  }
+
+  Future<void> sendMessageToCustomer(String complaintId, String message, String senderId, String senderName, String senderRole) async {
+    final newMessage = ComplaintMessage(
+      senderId: senderId,
+      senderName: senderName,
+      message: message,
+      senderRole: senderRole,
+      time: DateTime.now(),
+    );
+
+    await _db.collection('complaints').doc(complaintId).update({
+      'messages': FieldValue.arrayUnion([newMessage.toMap()]),
+      'updatedAt': Timestamp.now(),
+    });
   }
 }

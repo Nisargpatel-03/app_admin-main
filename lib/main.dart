@@ -5,6 +5,7 @@ import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/complaints_provider.dart';
 import 'providers/technicians_provider.dart';
+import 'providers/users_provider.dart';
 import 'providers/map_provider.dart';
 import 'providers/scheduled_jobs_provider.dart';
 import 'theme/app_theme.dart';
@@ -21,6 +22,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ComplaintsProvider()),
         ChangeNotifierProvider(create: (_) => TechniciansProvider()),
+        ChangeNotifierProvider(create: (_) => UsersProvider()),
         ChangeNotifierProvider(create: (_) => ScheduledJobsProvider()),
         ChangeNotifierProvider(create: (_) => MapProvider()),
       ],
